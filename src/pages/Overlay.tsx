@@ -354,25 +354,26 @@ export default function Overlay() {
   }
 
   return (
-    <>
+	  <>
       <Settings />
       <div className={`w-screen h-screen bg-gradient-to-br ${bgGradient} relative overflow-hidden`}>
       <MusicPlayer musicState={musicState} />
         {/* Звёздный фон (декоративный) */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(30)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-1 h-1 bg-white rounded-full opacity-20"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 60}%`,
-                animationDelay: `${Math.random() * 3}s`,
-              }}
-            />
-    </>
-        ))}
-      </div>
+		{/* Строка 364 */}
+		{[...Array(30)].map((_, i) => (
+		  <React.Fragment key={i}> 
+		    <div
+		      className="absolute w-1 h-1 bg-white rounded-full opacity-20"
+		      style={{
+		        left: `${Math.random() * 100}%`,
+		        top: `${Math.random() * 100}%`,
+		        animationDelay: `${Math.random() * 3}s`,
+		      }}
+		    />
+		  </React.Fragment>
+		</>
+		))}
 
       {/* Верхняя полоса — статус */}
       <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 py-3 bg-black/60 backdrop-blur-sm border-b border-white/10">
