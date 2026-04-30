@@ -1,7 +1,14 @@
 import { useEffect, useState, useRef } from 'react';
 import { subscribeToBroadcast } from '../lib/broadcast';
+import { loadVoices } from "../lib/tts";
+import { createVoiceProfile } from "../lib/voiceProfiles";
+import { setPlayerVoice } from "../lib/voiceManager";
+import { clearVoices } from "../lib/voiceManager";
+import { speak } from "../lib/tts";
+import { getPlayerVoice } from "../lib/voiceManager";
 import type { SaveState, MusicState, Player } from '../types/game';
 const [musicState, setMusicState] = useState<MusicState>('silence');
+import Settings from "../components/Settings";
 // ─── КОЛОБОК SVG (placeholder пока нет спрайтов) ─────────────
 function KolobokSVG({ color, state }: { color: string; state: string }) {
   const isAlive = state !== 'eliminated';
@@ -52,8 +59,22 @@ function KolobokSVG({ color, state }: { color: string; state: string }) {
     </svg>
   );
 }
-
+console.log("SPEAK:", text);
 // ─── СОСТОЯНИЯ АНИМАЦИИ КОЛОБКА ──────────────────────────────
+// Внутри useEffect в Overlay.tsx
+subscribeToBroadcast((event) => {
+  if (event.type === 'SPEAKING_START') {
+    const player = gameState.players.find(p => p.id === event.speakingId);
+    
+    // Передаем в speak текст и voiceId игрока
+    // voiceId нужно добавить в структуру Player в вашем store.ts
+    speak(event.text, player?.voiceId); 
+    
+    setSpeakingId(event.speakingId);
+    setSpeechText(event.text);
+  }
+});
+
 // idle → тихое покачивание
 // talk → быстрое движение
 // accused → дрожание
@@ -185,7 +206,14 @@ function MusicPlayer({ musicState }: { musicState: MusicState }) {
     defeat:     ['/assets/music/defeat.ogg'],
     silence:    [],
   };
-
+  useEffect(() => {
+    if (!gameState) return;
+    loadVoices().then((voices) => {
+      gameState.players.forEach(p => {
+        setPlayerVoice(p.id, createVoiceProfile(p.id, voices));
+      });
+    });
+  }, [gameState]);
   useEffect(() => {
     const files = musicFiles[musicState];
 
@@ -238,13 +266,17 @@ export default function Overlay() {
         case 'STATE_UPDATE':
           setGameState(msg.payload);
           break;
-        case 'MUSIC_CHANGE':
+	case 'MUSIC_CHANGE':
           setMusicState(msg.payload);
           break;
-        case 'SPEAKING_START':
-          setSpeakingId(msg.payload.playerId);
-          setSpeechText(msg.payload.text);
-          break;
+	case 'SPEAKING_START':
+	  setSpeakingId(msg.payload.playerId);
+	  setSpeechText(msg.payload.text);
+ 	 const playerId = msg.payload.playerId;
+  	const text = msg.payload.text;
+	  const profile = getPlayerVoice(playerId);
+	  speak(text, profile?.voiceId);
+	  break;
         case 'SPEAKING_END':
           setSpeakingId(null);
           setSpeechText('');
@@ -253,6 +285,7 @@ export default function Overlay() {
           // состояние уже придёт в STATE_UPDATE
           break;
         case 'GAME_RESET':
+          clearVoices();
           setGameState(null);
           setSpeakingId(null);
           setSpeechText('');
@@ -321,20 +354,23 @@ export default function Overlay() {
   }
 
   return (
-    <div className={`w-screen h-screen bg-gradient-to-br ${bgGradient} relative overflow-hidden`}>
-    <MusicPlayer musicState={musicState} />
-      {/* Звёздный фон (декоративный) */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <>
+      <Settings />
+      <div className={`w-screen h-screen bg-gradient-to-br ${bgGradient} relative overflow-hidden`}>
+      <MusicPlayer musicState={musicState} />
+        {/* Звёздный фон (декоративный) */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(30)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full opacity-20"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 60}%`,
-              animationDelay: `${Math.random() * 3}s`,
-            }}
-          />
+            <div
+              key={i}
+              className="absolute w-1 h-1 bg-white rounded-full opacity-20"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 60}%`,
+                animationDelay: `${Math.random() * 3}s`,
+              }}
+            />
+    </>
         ))}
       </div>
 
