@@ -31,6 +31,13 @@ const DEFAULT_API_CONFIG: ApiConfig = {
 };
 
 // ─── ИНТЕРФЕЙС СТОРА ────────────────────────────────────────
+export interface Player {
+  id: string;
+  name: string;
+  voiceId?: string; // Добавить это!
+  // ... остальные поля
+}
+
 export interface GameStore extends SaveState {
   isSpeaking: boolean;
   isGenerating: boolean;
