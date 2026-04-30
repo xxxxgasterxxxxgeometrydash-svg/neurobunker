@@ -57,7 +57,9 @@ export function speak(text: string, voiceId: string, onEnd?: () => void): void {
   const utterance = new SpeechSynthesisUtterance(text);
 
   const allVoices = window.speechSynthesis.getVoices();
-  const voice = allVoices.find(v => v.voiceURI === voiceId);
+  const voiceToUse = voiceId || selectedVoiceId;
+
+  const voice = allVoices.find(v => v.voiceURI === voiceToUse);
   if (voice) {
     utterance.voice = voice;
     utterance.lang = voice.lang;
@@ -95,4 +97,17 @@ export function isSpeaking(): boolean {
 // Примерный подсчёт токенов (1 токен ≈ 4 символа)
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
+}
+// выбранный голос (по умолчанию null)
+let selectedVoiceId: string | null = localStorage.getItem('tts_voice');
+
+// установить голос
+export function setVoice(id: string) {
+  selectedVoiceId = id;
+  localStorage.setItem('tts_voice', id);
+}
+
+// получить текущий голос
+export function getVoice(): string | null {
+  return selectedVoiceId;
 }
