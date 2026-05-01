@@ -7,8 +7,7 @@ import { clearVoices } from "../lib/voiceManager";
 import { speak } from "../lib/tts";
 import { getPlayerVoice } from "../lib/voiceManager";
 import type { SaveState, MusicState, Player } from '../types/game';
-const [musicState, setMusicState] = useState<MusicState>('silence');
-import Settings from "../components/Settings";
+import { Settings } from "../components/Settings";
 // ─── КОЛОБОК SVG (placeholder пока нет спрайтов) ─────────────
 function KolobokSVG({ color, state }: { color: string; state: string }) {
   const isAlive = state !== 'eliminated';
@@ -68,37 +67,32 @@ function KolobokSVG({ color, state }: { color: string; state: string }) {
     </svg>
   );
 }
-console.log("SPEAK:", text);
 // ─── СОСТОЯНИЯ АНИМАЦИИ КОЛОБКА ──────────────────────────────
 // Внутри useEffect в Overlay.tsx
 subscribeToBroadcast((event) => {
   if (event.type === 'SPEAKING_START') {
-    const player = gameState.players.find(p => p.id === event.speakingId);
-    
-    // Передаем в speak текст и voiceId игрока
-    // voiceId нужно добавить в структуру Player в вашем store.ts
-    speak(event.text, player?.voiceId); 
-    
-    setSpeakingId(event.speakingId);
-    setSpeechText(event.text);
+    // 1. Находим игрока, который говорит
+    // Важно: в твоем стейте это может быть players или gameState.players
+    const player = players?.find(p => p.id === event.playerId);
+
+    // 2. Берем текст из события
+    const speechContent = event.text || "";
+
+    // 3. Озвучиваем: текст + голос игрока (voiceId)
+    // Это и есть реализация твоего Пункта №2!
+    speak(speechContent, player?.voiceId);
+
+    // 4. Обновляем визуальное состояние
+    setSpeakingId(event.playerId);
+    setSpeechText(speechContent);
+  }
+  
+  if (event.type === 'SPEAKING_END') {
+    setSpeakingId(null);
+    setSpeechText('');
   }
 });
 
-// idle → тихое покачивание
-// talk → быстрое движение
-// accused → дрожание
-// scared → нервное движение
-// eliminated → затемнён, не анимирован
-// winner → радостное подпрыгивание
-
-function getKolobokAnimation(state: string, isSpeaking: boolean): string {
-  if (state === 'eliminated') return '';
-  if (isSpeaking) return 'animate-[kolobokTalk_0.3s_ease-in-out_infinite_alternate]';
-  if (state === 'accused') return 'animate-[kolobokShake_0.4s_ease-in-out_infinite_alternate]';
-  if (state === 'scared') return 'animate-[kolobokShake_0.6s_ease-in-out_infinite_alternate]';
-  if (state === 'winner') return 'animate-[kolobokBounce_0.5s_ease-in-out_infinite_alternate]';
-  return 'animate-[kolobokIdle_3s_ease-in-out_infinite_alternate]';
-}
 
 // ─── КОМПОНЕНТ КОЛОБКА ──────────────────────────────────────
 function KolobokCharacter({
@@ -274,6 +268,7 @@ function MusicPlayer({ musicState }: { musicState: MusicState }) {
 }
 // ─── ГЛАВНАЯ СТРАНИЦА OVERLAY ────────────────────────────────
 export default function Overlay() {
+  const [musicState, setMusicState] = useState<MusicState>('silence');
   const [gameState, setGameState] = useState<SaveState | null>(null);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [speechText, setSpeechText] = useState('');
@@ -281,24 +276,44 @@ export default function Overlay() {
   useEffect(() => {
     const unsub = subscribeToBroadcast(msg => {
       switch (msg.type) {
+case 'VOLUME_CHANGE': {
+  const v = Number(msg.value); 
+  localStorage.setItem('musicVolume', String(v));
+  
+  // Мгновенно меняем громкость в единственном объекте плеера
+  if (musicListener && musicListener.audio) {
+    musicListener.audio.volume = v;
+  }
+  break;
+}
+  
+  // 3. Событие (используем msg.value)
+  window.dispatchEvent(new CustomEvent('volumeChanged', { detail: msg.value }));
+  break;
+
+
         case 'STATE_UPDATE':
           setGameState(msg.payload);
           break;
 	case 'MUSIC_CHANGE':
           setMusicState(msg.payload);
           break;
-	case 'SPEAKING_START':
-	  setSpeakingId(msg.payload.playerId);
-	  setSpeechText(msg.payload.text);
- 	 const playerId = msg.payload.playerId;
-  	const text = msg.payload.text;
-	  const profile = getPlayerVoice(playerId);
-	  speak(text, profile?.voiceId);
-	  break;
-        case 'SPEAKING_END':
-          setSpeakingId(null);
-          setSpeechText('');
+        case 'SPEAKING_START': { // Добавь фигурную скобку здесь
+          // 1. Сначала ПРИНИМАЕМ данные
+          const playerId = msg.payload.playerId;
+          const textContent = msg.payload.text;
+
+          // 2. Теперь ИСПОЛЬЗУЕМ их
+          setSpeakingId(playerId);
+          setSpeechText(textContent);
+
+          // 3. Находим голос (Пункт №2) и озвучиваем
+          // Используем textContent (который мы создали выше), а не просто text
+          const profile = getPlayerVoice(playerId);
+          speak(textContent, profile?.voiceId);
           break;
+        } // И закрой фигурную скобку здесь
+
         case 'PLAYER_ELIMINATED':
           // состояние уже придёт в STATE_UPDATE
           break;
