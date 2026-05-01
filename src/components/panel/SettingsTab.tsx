@@ -1,180 +1,112 @@
-import { useState } from 'react';
-import { useGameStore } from '../../store/gameStore';
-import type { ApiConfig } from '../../types/game';
+import { useEffect, useState } from "react";
+import {
+  loadVoices,
+  setVoice,
+  getVoice,
+  speak,
+  VoiceOption,
+} from "../lib/tts";
 
-const MODEL_DOCS: Record<string, { url: string; free: string; speed: string }> = {
-  gemini:     { url: 'https://aistudio.google.com', free: '15 req/min бесплатно', speed: '⚡⚡⚡' },
-  gigachat:   { url: 'https://developers.sber.ru/portal/products/gigachat', free: 'Бесплатный тир', speed: '⚡⚡' },
-  deepseek:   { url: 'https://platform.deepseek.com', free: '$0.001/req', speed: '⚡⚡' },
-  groq:       { url: 'https://console.groq.com', free: 'Бесплатно + быстро', speed: '⚡⚡⚡' },
-  mistral:    { url: 'https://console.mistral.ai', free: '$0.002/1k токенов', speed: '⚡⚡' },
-  openrouter: { url: 'https://openrouter.ai', free: 'Бесплатные модели', speed: '⚡⚡' },
-  yandex:     { url: 'https://cloud.yandex.ru/services/yandexgpt', free: 'IAM-токен', speed: '⚡⚡' },
-  gemma:      { url: 'https://aistudio.google.com', free: 'Бесплатно', speed: '⚡⚡⚡' },
-};
+// Убрали default, чтобы импорт { Settings } в Overlay не ломался
+export function Settings() {
+  const [volume, setVolume] = useState(0.4);
+  const [voices, setVoices] = useState<VoiceOption[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<string>("");
+  const [open, setOpen] = useState(false); // По умолчанию закрыто, чтобы не мешать
+  const [voicesLoaded, setVoicesLoaded] = useState(false);
 
-const MODEL_LABELS: Record<string, string> = {
-  gemini: '🔵 Google Gemini',
-  gigachat: '🟢 GigaChat (Сбер)',
-  deepseek: '🟣 DeepSeek',
-  groq: '🟠 Groq (LLaMA)',
-  mistral: '🔴 Mistral AI',
-  openrouter: '🟩 OpenRouter',
-  yandex: '🟡 YandexGPT',
-  gemma: '🩷 Gemma AI',
-};
+  useEffect(() => {
+    const v = Number(localStorage.getItem("musicVolume") ?? "0.4");
+    setVolume(v);
+    // Сразу применяем громкость при загрузке
+    window.dispatchEvent(new Event("volumeChanged"));
+  }, []);
 
-export default function SettingsTab() {
-  const { apiConfig, setApiConfig, apiMode, setApiMode } = useGameStore();
-  const [expanded, setExpanded] = useState<string | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    loadVoices().then((v) => {
+      if (!mounted) return;
+      setVoices(v);
+      setVoicesLoaded(true);
+      const saved = getVoice();
+      if (saved) {
+        setSelectedVoice(saved);
+      } else if (v.length > 0) {
+        setSelectedVoice(v[0].id);
+      }
+    });
+    return () => { mounted = false; };
+  }, []);
 
-  const updateKey = (model: keyof ApiConfig, field: string, value: string) => {
-    setApiConfig({
-      [model]: { ...apiConfig[model], [field]: value }
-    } as Partial<ApiConfig>);
-  };
+  function handleVolumeChange(v: number) {
+    setVolume(v);
+    localStorage.setItem("musicVolume", String(v));
+    // Генерируем событие, чтобы MusicListener.ts мгновенно изменил звук
+    window.dispatchEvent(new Event("volumeChanged"));
+  }
+
+  function handleVoiceChange(id: string) {
+    setSelectedVoice(id);
+    setVoice(id);
+    localStorage.setItem("selectedVoice", id); // Сохраняем выбор
+  }
+
+  function handleTestVoice() {
+    if (!voicesLoaded) return;
+    speak("Проверка связи в нейробункере. Как слышно?", selectedVoice);
+  }
 
   return (
-    <div className="space-y-4">
-      {/* Режим */}
-      <div className="bg-gray-900 rounded-xl p-4 border border-gray-700">
-        <div className="text-sm font-bold text-gray-300 mb-3">⚙️ Режим работы AI</div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setApiMode('demo')}
-            className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
-              apiMode === 'demo'
-                ? 'bg-green-700 text-white border border-green-500'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-            }`}
-          >
-            🤖 ДЕМО<br/>
-            <span className="text-xs font-normal opacity-70">Заглушки, без API ключей</span>
-          </button>
-          <button
-            onClick={() => setApiMode('real')}
-            className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
-              apiMode === 'real'
-                ? 'bg-purple-700 text-white border border-purple-500'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-            }`}
-          >
-            🌐 РЕАЛЬНЫЙ<br/>
-            <span className="text-xs font-normal opacity-70">Реальные API ключи</span>
-          </button>
-        </div>
-      </div>
+    <div className="fixed top-4 right-4 z-[9999]">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="bg-black/80 hover:bg-white/20 text-white w-10 h-10 rounded-full border border-white/20 shadow-xl backdrop-blur-md transition-all"
+      >
+        ⚙️
+      </button>
 
-      {/* Инструкция */}
-      <div className="bg-blue-950 rounded-xl p-4 border border-blue-800">
-        <div className="text-sm font-bold text-blue-300 mb-2">📘 Как подключить AI</div>
-        <div className="text-xs text-blue-200 space-y-2 leading-relaxed">
-          <p>1. Переключитесь в режим <strong>РЕАЛЬНЫЙ</strong></p>
-          <p>2. Для каждого игрока введите API ключ нужного сервиса</p>
-          <p>3. Рекомендации по бесплатным API:</p>
-          <ul className="ml-4 space-y-1">
-            <li>• <strong>Groq</strong> — самый быстрый и бесплатный → console.groq.com</li>
-            <li>• <strong>Gemini Flash</strong> — 15 запросов/мин бесплатно → aistudio.google.com</li>
-            <li>• <strong>OpenRouter</strong> — бесплатные модели → openrouter.ai</li>
-          </ul>
-          <p>4. Назначьте каждому игроку нужную модель в разделе <strong>Игроки</strong></p>
-        </div>
-      </div>
+      {open && (
+        <div className="mt-2 w-80 bg-slate-900/95 backdrop-blur-lg text-white rounded-2xl p-5 shadow-2xl border border-white/10 space-y-5 animate-in fade-in zoom-in duration-200">
+          <h3 className="text-sm font-black uppercase tracking-widest text-blue-400">Настройки системы</h3>
 
-      {/* API ключи */}
-      <div className="space-y-3">
-        <div className="text-sm font-bold text-gray-300">🔑 API Ключи</div>
-        {(Object.keys(MODEL_LABELS) as Array<keyof ApiConfig>).map(model => {
-          const info = MODEL_DOCS[model as string];
-          const cfg = apiConfig[model] as Record<string, string>;
-          const isOpen = expanded === model;
-          const hasKey = cfg?.key && cfg.key.length > 0;
-
-          return (
-            <div key={model} className="bg-gray-900 rounded-xl border border-gray-700">
-              <button
-                onClick={() => setExpanded(isOpen ? null : model as string)}
-                className="w-full p-4 flex items-center justify-between hover:bg-gray-800 rounded-xl transition-all text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="font-medium">{MODEL_LABELS[model as string]}</span>
-                  {hasKey && <span className="text-xs bg-green-700 text-green-100 px-2 py-0.5 rounded-full">✓ ключ задан</span>}
-                  <span className="text-xs text-gray-600">{info?.speed}</span>
-                </div>
-                <span className="text-gray-500">{isOpen ? '▲' : '▼'}</span>
-              </button>
-
-              {isOpen && (
-                <div className="px-4 pb-4 space-y-3 border-t border-gray-800 pt-3">
-                  <div className="text-xs text-gray-500">
-                    Стоимость: {info?.free} •
-                    <a href={info?.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 ml-1 underline">
-                      Получить ключ →
-                    </a>
-                  </div>
-
-                  {/* API Key */}
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">API Key</label>
-                    <input
-                      type="password"
-                      value={cfg?.key ?? ''}
-                      onChange={e => updateKey(model, 'key', e.target.value)}
-                      placeholder="sk-..."
-                      className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500 font-mono"
-                    />
-                  </div>
-
-                  {/* Model name */}
-                  {model !== 'yandex' && (
-                    <div>
-                      <label className="text-xs text-gray-400 mb-1 block">Модель</label>
-                      <input
-                        type="text"
-                        value={cfg?.model ?? ''}
-                        onChange={e => updateKey(model, 'model', e.target.value)}
-                        className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500 font-mono"
-                      />
-                    </div>
-                  )}
-
-                  {/* YandexGPT специфично */}
-                  {model === 'yandex' && (
-                    <>
-                      <div>
-                        <label className="text-xs text-gray-400 mb-1 block">Folder ID</label>
-                        <input
-                          type="text"
-                          value={(cfg as Record<string, string>)?.folderId ?? ''}
-                          onChange={e => updateKey(model, 'folderId', e.target.value)}
-                          className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500 font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-400 mb-1 block">IAM Token</label>
-                        <input
-                          type="password"
-                          value={(cfg as Record<string, string>)?.iamToken ?? ''}
-                          onChange={e => updateKey(model, 'iamToken', e.target.value)}
-                          className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500 font-mono"
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
+          {/* 🔊 ГРОМКОСТЬ */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-[10px] font-bold uppercase opacity-60">
+              <span>Громкость музыки</span>
+              <span>{Math.round(volume * 100)}%</span>
             </div>
-          );
-        })}
-      </div>
+            <input
+              type="range" min={0} max={1} step={0.01}
+              value={volume}
+              onChange={(e) => handleVolumeChange(Number(e.target.value))}
+              className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500 shadow-inner"
+            />
+          </div>
 
-      {/* Предупреждение */}
-      <div className="bg-yellow-950 rounded-xl p-4 border border-yellow-800">
-        <div className="text-xs text-yellow-300">
-          ⚠️ API ключи хранятся только в браузере (localStorage). Не делитесь скриншотами этого экрана.
-          При использовании в реальном проекте — рассмотрите серверный прокси вместо прямых ключей.
+          {/* 🎤 ГОЛОС */}
+          <div className="space-y-2">
+            <div className="text-[10px] font-bold uppercase opacity-60">Голос ИИ (Общий)</div>
+            <select
+              value={selectedVoice}
+              onChange={(e) => handleVoiceChange(e.target.value)}
+              className="w-full bg-slate-800 border border-white/5 text-white text-xs rounded-xl p-3 outline-none focus:ring-2 ring-blue-500/50"
+            >
+              {!voicesLoaded && <option>Загрузка голосов...</option>}
+              {voices.map((v) => (
+                <option key={v.id} value={v.id}>{v.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={handleTestVoice}
+            disabled={!voicesLoaded}
+            className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white text-xs font-bold py-3 rounded-xl transition-all active:scale-95 shadow-lg shadow-blue-900/20"
+          >
+            ▶️ ТЕСТ ОЗВУЧКИ
+          </button>
         </div>
-      </div>
+      )}
     </div>
   );
 }
