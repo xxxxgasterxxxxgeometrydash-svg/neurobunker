@@ -13,7 +13,16 @@ import Settings from "../components/Settings";
 function KolobokSVG({ color, state }: { color: string; state: string }) {
   const isAlive = state !== 'eliminated';
   const isTalking = state === 'alive' && false; // управляется анимацией
-
+  if (!players || players.length === 0) {
+    return (
+      <div style={{ backgroundColor: '#000', color: '#fff', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif' }}>
+        <div style={{ textAlign: 'center' }}>
+          <h1 style={{ fontSize: '24px', marginBottom: '10px' }}>📡 ОЖИДАНИЕ ПОДКЛЮЧЕНИЯ...</h1>
+          <p style={{ opacity: 0.5 }}>Запусти панель управления, чтобы передать данные</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <svg viewBox="0 0 80 100" className="w-full h-full drop-shadow-lg">
       {/* Тело */}
@@ -102,7 +111,16 @@ function KolobokCharacter({
   speechText: string;
 }) {
   const anim = getKolobokAnimation(player.state, isSpeaking);
-
+  if (!players || players.length === 0) {
+    return (
+      <div style={{ backgroundColor: '#000', color: '#fff', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif' }}>
+        <div style={{ textAlign: 'center' }}>
+          <h1 style={{ fontSize: '24px', marginBottom: '10px' }}>📡 ОЖИДАНИЕ ПОДКЛЮЧЕНИЯ...</h1>
+          <p style={{ opacity: 0.5 }}>Запусти панель управления, чтобы передать данные</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div
       className="absolute flex flex-col items-center"
@@ -352,9 +370,19 @@ export default function Overlay() {
       </div>
     );
   }
+  if (!players || players.length === 0) {
+    return (
+      <div style={{ backgroundColor: '#000', color: '#fff', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif' }}>
+        <div style={{ textAlign: 'center' }}>
+          <h1 style={{ fontSize: '24px', marginBottom: '10px' }}>📡 ОЖИДАНИЕ ПОДКЛЮЧЕНИЯ...</h1>
+          <p style={{ opacity: 0.5 }}>Запусти панель управления, чтобы передать данные</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-	  <>
+    <>
       <Settings />
       <div className={`w-screen h-screen bg-gradient-to-br ${bgGradient} relative overflow-hidden`}>
       <MusicPlayer musicState={musicState} />
@@ -372,9 +400,8 @@ export default function Overlay() {
 		      }}
 		    />
 		  </React.Fragment>
-		</>
 		))}
-
+              </div>
       {/* Верхняя полоса — статус */}
       <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 py-3 bg-black/60 backdrop-blur-sm border-b border-white/10">
         <div className="flex items-center gap-4">
@@ -462,5 +489,6 @@ export default function Overlay() {
         }
       `}</style>
     </div>
+    </>
   );
 }
