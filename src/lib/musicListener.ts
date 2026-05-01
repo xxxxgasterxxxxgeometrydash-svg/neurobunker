@@ -1,38 +1,42 @@
-import { useGameStore } from "../store/gameStore";
+import { useGameStore } from '../store/gameStore';
 
 class MusicListener {
-  private audio = new Audio();
-  private timeout: any = null;
-  private discussionIndex = 0;
-  private volume = 0.4;
+  public audio = new Audio(); // Один объект на всё время
+  public volume = Number(localStorage.getItem('musicVolume') ?? '0.4');
   private currentState = "";
-
   private discussionTracks = [
     "/assets/music/discussion_1.ogg",
     "/assets/music/discussion_2.ogg",
     "/assets/music/discussion_3.ogg",
     "/assets/music/discussion_4.ogg",
-    "/assets/music/discussion_5.ogg",
+    "/assets/music/discussion_5.ogg"
   ];
+  private discussionIndex = 0;
 
-  start() {
-    let prevState = "";
+  constructor() {
+    this.audio.loop = true;
+    this.audio.volume = this.volume;
 
+    // Слушаем мгновенное изменение громкости
+    window.addEventListener('volumeChanged', (e: any) => {
+      this.volume = e.detail;
+      this.audio.volume = this.volume;
+    });
+  }
+
+  public start() {
     useGameStore.subscribe((state) => {
-      // ❗ реагируем ТОЛЬКО если реально сменился этап
-      if (state.musicState !== prevState) {
-        prevState = state.musicState;
+      if (state.musicState !== this.currentState) {
         this.handleState(state.musicState);
       }
     });
   }
 
   private handleState(state: string) {
-    // ❗ если тот же state — ничего не делаем
-    if (this.currentState === state) return;
     this.currentState = state;
-
-    this.stop();
+    
+    // Сначала останавливаем текущий трек
+    this.audio.pause();
 
     if (state === "discussion") {
       this.playDiscussion();
@@ -40,63 +44,23 @@ class MusicListener {
     }
 
     let src = "";
-
     if (state === "disaster") src = "/assets/music/disaster.ogg";
     if (state === "elimination") src = "/assets/music/elimination.ogg";
     if (state === "victory") src = "/assets/music/victory.ogg";
     if (state === "defeat") src = "/assets/music/defeat.ogg";
 
-    if (!src) return;
-
-    this.audio = new Audio(src);
-    this.audio.volume = this.volume;
-    this.audio.loop = true;
-
-    this.audio.play().catch(() => {});
+    if (src) {
+      this.audio.src = src;
+      this.audio.play().catch(() => console.log("Нужен клик по экрану"));
+    }
   }
 
   private playDiscussion() {
-    const playNext = () => {
-      // ❗ если этап сменился — выходим
-      if (this.currentState !== "discussion") return;
-
-      const src =
-        this.discussionTracks[
-          this.discussionIndex % this.discussionTracks.length
-        ];
-
-      this.discussionIndex++;
-
-      this.audio = new Audio(src);
-      this.audio.volume = this.volume;
-      this.audio.loop = false;
-
-      this.audio.onended = () => {
-        this.timeout = setTimeout(() => {
-          playNext();
-        }, 5000);
-      };
-
-      this.audio.play().catch(() => {});
-    };
-
-    playNext();
-  }
-
-  private stop() {
-    if (this.timeout) {
-      clearTimeout(this.timeout);
-      this.timeout = null;
-    }
-
-    this.audio.pause();
-    this.audio.currentTime = 0;
-  }
-
-  // 🔊 управление громкостью
-  setVolume(v: number) {
-    this.volume = v;
-    this.audio.volume = v;
+    const src = this.discussionTracks[this.discussionIndex % this.discussionTracks.length];
+    this.discussionIndex++;
+    
+    this.audio.src = src;
+    this.audio.play().catch(() => console.log("Нужен клик по экрану"));
   }
 }
 
